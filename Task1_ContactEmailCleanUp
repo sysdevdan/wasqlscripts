@@ -1,0 +1,117 @@
+/*********************************************************************************
+** File:    Task1_ContactEmailCleanUp											**
+** Name:	SQL Task 1 - Email Address Clean Up									**
+** Desc:	Script to transform results of a view into CRMable data				**
+** Auth:	Dan Pearce															**
+** Date:	12/10/2016															**
+**********************************************************************************
+** Change History
+**********************************************************************************
+** PR   Date	    Author  Description	
+** --   --------   -------   -----------------------------------------------------
+** 
+*********************************************************************************/
+USE [WaterAid Integration Hub]
+
+
+WITH AllEmails as
+			(
+				SELECT
+					WHID
+					,EMailAddress1
+					,EMailAddress2
+					,EMailAddress3
+
+				FROM
+					[WaterAid Integration Hub].wh.WH_ContactBase
+
+				WHERE
+					EMailAddress1 is not null
+					or
+					EMailAddress2 is not null
+					or
+					EMailAddress3 is not null
+			)
+
+-------------------------------------------------------------------------
+
+
+,AllEmailList AS
+				(
+					SELECT
+						WHID
+						,CASE
+							WHEN EMailAddress1 is null and EMailAddress2 is not null
+							THEN EMailAddress2
+
+							WHEN EMailAddress1 is null and EMailAddress3 is not null
+							THEN EMailAddress3
+
+							ELSE EMailAddress1
+			
+						END AS EMailAddress1
+
+						,CASE
+							WHEN EMailAddress2 is null and EMailAddress3 is not null
+							THEN EMailAddress3
+				
+							ELSE EMailAddress2
+
+						END AS EmailAddress2
+
+						,EMailAddress3
+
+					FROM
+						AllEmails
+
+					WHERE
+						EMailAddress2 is not null
+				)
+,StageTwo AS
+				(
+					SELECT
+						WHID
+						,EmailAddress1
+						,CASE
+							WHEN EMailAddress1 = EMailAddress2 and EMailAddress2 <> EMailAddress3
+							THEN EMailAddress3
+							WHEN EMailAddress1 = EmailAddress2
+							THEN null
+							ELSE EMailAddress2
+							END AS EMailAddress2
+
+						,CASE
+							WHEN EMailAddress3 = EMailAddress1 or EMailAddress3 = EMailAddress2
+							THEN null
+							ELSE EMailAddress3
+							END AS EMailAddress3
+
+					FROM
+						AllEmailList
+				)
+
+SELECT
+	WHID
+	,CASE
+		WHEN EMailaddress1 = 'Anonymous'
+		THEN null
+		ELSE EMailAddress1
+		END AS EMailAddress1
+
+	,CASE
+		WHEN EMailAddress2 = 'Anonymous'
+		THEN null
+		ELSE EMailAddress2
+		END AS EMailAddress2
+
+	,CASE
+		WHEN EMailAddress3 = EMailAddress2
+		THEN null
+		
+		WHEN EMailAddress3 = 'Anonymous'
+		THEN null
+		ELSE EMailAddress3
+		END AS EMailAddress3
+
+FROM
+	StageTwo
